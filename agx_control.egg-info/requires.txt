@@ -1,5 +1,0 @@
-numpy
-pynput
-lcm
-pygame
-pyAgxArm @ git+https://github.com/agilexrobotics/pyAgxArm.git

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agx-control"
+version = "0.1.0"
+description = "AGX control examples and communication scripts"
+requires-python = ">=3.8,<=3.11"
+dependencies = [
+    "numpy",
+    "pynput",
+    "lcm",
+    "pygame",
+    "pyAgxArm @ git+https://github.com/agilexrobotics/pyAgxArm.git",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["communication*"]
+exclude = ["can*", "examples*", "test*"]
+namespaces = true

@@ -1,0 +1,6 @@
+pyproject.toml
+agx_control.egg-info/PKG-INFO
+agx_control.egg-info/SOURCES.txt
+agx_control.egg-info/dependency_links.txt
+agx_control.egg-info/requires.txt
+agx_control.egg-info/top_level.txt

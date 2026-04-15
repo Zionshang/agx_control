@@ -6,3 +6,4 @@ DO NOT MODIFY BY HAND!!!!
 from .ArmCartesianCmd import ArmCartesianCmd
 from .ArmJointCmd import ArmJointCmd
 from .ArmServiceCmd import ArmServiceCmd
+from .ArmState import ArmState

@@ -3,19 +3,21 @@ import argparse
 import time
 
 import lcm
-from msg import ArmCartesianCmd, ArmJointCmd, ArmServiceCmd
+from msg import ArmCartesianCmd, ArmJointCmd, ArmServiceCmd, ArmState
 from pyAgxArm import AgxArmFactory, ArmModel, PiperFW, create_agx_arm_config
 
 
 ARM_CARTESIAN_CMD_CHANNEL = "ARM_CARTESIAN_CMD"
 ARM_JOINT_CMD_CHANNEL = "ARM_JOINT_CMD"
 ARM_SERVICE_CMD_CHANNEL = "ARM_SERVICE_CMD"
+ARM_STATE_CHANNEL = "ARM_STATE"
 DEFAULT_LCM_URL = "udpm://239.255.76.67:7667?ttl=1"
 
 home = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 tcp_offset = [0.0, 0.0, 0.13, 0.0, -1.57079632679, 0.0]
 gripper_force = 1.0
 gripper_max = 0.1
+state_dt = 0.02
 
 
 def build_parser():
@@ -48,6 +50,25 @@ def ensure_enabled():
 def move_gripper(pos):
     pos = clamp(pos, 0.0, gripper_max)
     gripper.move_gripper_m(value=pos, force=gripper_force)
+
+
+def publish_state(lc):
+    joint_msg = robot.get_joint_angles()
+    tcp_msg = robot.get_tcp_pose()
+    if joint_msg is None or tcp_msg is None:
+        return
+
+    state = ArmState()
+    state.utime = int(time.time() * 1_000_000)
+    state.joint_pos = list(joint_msg.msg)
+    state.num_joints = len(state.joint_pos)
+    state.tcp_pose = list(tcp_msg.msg)
+
+    gripper_msg = gripper.get_gripper_status()
+    if gripper_msg is not None:
+        state.gripper_pos = gripper_msg.msg.value
+
+    lc.publish(ARM_STATE_CHANNEL, state.encode())
 
 
 def on_cartesian_cmd(channel, data):
@@ -97,9 +118,14 @@ try:
     print(f"  {ARM_CARTESIAN_CMD_CHANNEL}: ArmCartesianCmd")
     print(f"  {ARM_JOINT_CMD_CHANNEL}: ArmJointCmd")
     print(f"  {ARM_SERVICE_CMD_CHANNEL}: ArmServiceCmd")
+    print(f"  {ARM_STATE_CHANNEL}: ArmState")
 
+    next_state_t = time.monotonic()
     while True:
-        lc.handle()
+        lc.handle_timeout(5)
+        if time.monotonic() >= next_state_t:
+            publish_state(lc)
+            next_state_t += state_dt
 except KeyboardInterrupt:
     print("")
 finally:

@@ -1,0 +1,11 @@
+package msg;
+
+struct ArmState
+{
+    int64_t utime;
+
+    int32_t num_joints;
+    double joint_pos[num_joints];
+    double tcp_pose[6];
+    double gripper_pos;
+}

@@ -1,0 +1,11 @@
+package msg;
+
+struct ArmJointCmd
+{
+    int64_t utime;
+
+    int32_t num_joints;
+    double joint_pos[num_joints];
+    double gripper_pos;
+    double preview_time; // Expected arrival time, ignored on some arms (e.g., Piper series).
+}

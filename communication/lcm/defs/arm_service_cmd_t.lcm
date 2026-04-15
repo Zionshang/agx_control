@@ -1,0 +1,11 @@
+package msg;
+
+struct ArmServiceCmd
+{
+    int64_t utime;
+
+    const int32_t HOME = 1;
+    const int32_t PASSIVE = 2;
+
+    int32_t command;
+}

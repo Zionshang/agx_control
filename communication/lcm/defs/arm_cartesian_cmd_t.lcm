@@ -1,0 +1,10 @@
+package msg;
+
+struct ArmCartesianCmd
+{
+    int64_t utime;
+
+    double tcp_pose[6]; // x,y,z,r,p,y (zyx Euler)
+    double gripper_pos;
+    double preview_time; // Expected arrival time, ignored on some arms (e.g., Piper series).
+}

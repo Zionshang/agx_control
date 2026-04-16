@@ -18,10 +18,11 @@ arm_lcm_server
 Build Docker image:
 
 ```bash
-docker build -f docker/Dockerfile -t agx-control-arm-lcm .
+git submodule update --init --recursive
+docker build -f docker/Dockerfile -t agx-control:latest .
 ```
 
-The build needs network access because `pyAgxArm` is installed from GitHub.
+Docker installs `pyAgxArm` from `third_party/pyAgxArm`.
 
 Enter the Docker shell:
 
@@ -30,7 +31,7 @@ docker run --rm -it \
   --network host \
   --cap-add NET_ADMIN \
   --cap-add NET_RAW \
-  agx-control-arm-lcm
+  agx-control:latest
 ```
 
 Run this on the Linux robot host so `--network host` can expose the host
@@ -55,6 +56,8 @@ ip link show can0
 Run examples directly after installing this package outside Docker:
 
 ```bash
+git submodule update --init --recursive
+python -m pip install -e .
 keyboard_control
 joystick_control
 ```
@@ -68,7 +71,7 @@ docker run --rm -it \
   --cap-add NET_ADMIN \
   --cap-add NET_RAW \
   --device /dev/input \
-  agx-control-arm-lcm
+  agx-control:latest
 ```
 
 `keyboard_control` depends on Linux desktop keyboard input support, and

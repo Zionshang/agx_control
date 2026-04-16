@@ -12,7 +12,7 @@ dependencies = [
     "pynput",
     "lcm",
     "pygame",
-    "pyAgxArm @ git+https://github.com/agilexrobotics/pyAgxArm.git",
+    "pyAgxArm @ file:third_party/pyAgxArm",
 ]
 
 [project.scripts]

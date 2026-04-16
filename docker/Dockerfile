@@ -6,15 +6,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        bash \
         build-essential \
         ca-certificates \
         can-utils \
-        cmake \
         git \
         iproute2 \
-        libglib2.0-dev \
-        pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -22,6 +18,7 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY communication ./communication
 COPY examples ./examples
+COPY third_party/pyAgxArm ./third_party/pyAgxArm
 
 RUN python -m pip install --upgrade pip setuptools wheel \
     && python -m pip install .

@@ -1,10 +1,25 @@
 # Docker
 
+Init submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
 Build image:
 
 ```bash
-docker build -f docker/Dockerfile -t agx-control:latest .
+docker build \
+  --network=host \
+  --build-arg HTTP_PROXY=http://127.0.0.1:7890 \
+  --build-arg HTTPS_PROXY=http://127.0.0.1:7890 \
+  -f docker/Dockerfile \
+  -t agx-control:latest \
+  .
 ```
+
+The image installs `pyAgxArm` through `pyproject.toml` from
+`third_party/pyAgxArm`, not from a remote Git URL.
 
 Export image:
 

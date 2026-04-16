@@ -5,7 +5,7 @@ import time
 import lcm
 from pyAgxArm import AgxArmFactory, ArmModel, PiperFW, create_agx_arm_config
 
-from .msg import ArmCartesianCmd, ArmJointCmd, ArmServiceCmd, ArmState
+from msg import ArmCartesianCmd, ArmJointCmd, ArmServiceCmd, ArmState
 
 
 ARM_CARTESIAN_CMD_CHANNEL = "ARM_CARTESIAN_CMD"

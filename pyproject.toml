@@ -17,9 +17,11 @@ dependencies = [
 
 [project.scripts]
 arm_lcm_server = "communication.lcm.arm_lcm_server:main"
+keyboard_control = "examples.keyboard_control:main"
+joystick_control = "examples.joystick_control:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["communication*"]
-exclude = ["can*", "examples*", "test*"]
+include = ["communication*", "examples*"]
+exclude = ["can*", "test*"]
 namespaces = true

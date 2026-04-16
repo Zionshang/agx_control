@@ -6,14 +6,6 @@ from pynput import keyboard
 from pyAgxArm import AgxArmFactory, ArmModel, PiperFW, create_agx_arm_config
 
 
-cfg = create_agx_arm_config(
-    robot=ArmModel.PIPER_L,
-    firmeware_version=PiperFW.V183,
-    channel="can0",
-)
-robot = AgxArmFactory.create_arm(cfg)
-gripper = robot.init_effector(robot.OPTIONS.EFFECTOR.AGX_GRIPPER)
-
 dt = 0.02
 pos_step = 0.001
 rot_step = 0.005
@@ -77,63 +69,92 @@ def clamp_pose(pose):
     pose[5] = max(-pi, min(pi, pose[5]))
 
 
-try:
-    robot.connect()
-    while not robot.enable():
-        time.sleep(0.01)
-    robot.set_speed_percent(100)
-    robot.set_tcp_offset(tcp_offset)
-    robot.move_j(home)
-    time.sleep(1.0)
+def main():
+    global running
 
-    pose_msg = None
-    while pose_msg is None:
-        pose_msg = robot.get_tcp_pose()
-        time.sleep(0.01)
-    target = list(pose_msg.msg)
+    cfg = create_agx_arm_config(
+        robot=ArmModel.PIPER_L,
+        firmeware_version=PiperFW.V183,
+        channel="can0",
+    )
+    robot = AgxArmFactory.create_arm(cfg)
+    gripper = robot.init_effector(robot.OPTIONS.EFFECTOR.AGX_GRIPPER)
 
-    gripper_pos = 0.0
-    gripper_status = gripper.get_gripper_status()
-    if gripper_status is not None:
-        gripper_pos = max(0.0, min(gripper_max, gripper_status.msg.value))
+    try:
+        robot.connect()
+        while not robot.enable():
+            time.sleep(0.01)
+        robot.set_speed_percent(100)
+        robot.set_tcp_offset(tcp_offset)
+        robot.move_j(home)
+        time.sleep(1.0)
 
-    listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-    listener.start()
-
-    print("Piper-L keyboard teleop")
-    print("arrows: x/y, page up/down: z, q/a: roll, w/s: pitch, e/d: yaw")
-    print("r/f: open/close gripper, space: home, esc or ctrl-c: quit")
-
-    while running:
-        if keys[keyboard.Key.space]:
-            robot.move_j(home)
-            time.sleep(1.0)
+        pose_msg = None
+        while pose_msg is None:
             pose_msg = robot.get_tcp_pose()
-            if pose_msg is not None:
-                target = list(pose_msg.msg)
-            keys[keyboard.Key.space] = False
+            time.sleep(0.01)
+        target = list(pose_msg.msg)
 
-        target[0] += axis(keyboard.Key.up, keyboard.Key.down) * pos_step
-        target[1] += axis(keyboard.Key.left, keyboard.Key.right) * pos_step
-        target[2] += axis(keyboard.Key.page_up, keyboard.Key.page_down) * pos_step
-        target[3] += axis(keyboard.KeyCode.from_char("q"), keyboard.KeyCode.from_char("a")) * rot_step
-        target[4] += axis(keyboard.KeyCode.from_char("w"), keyboard.KeyCode.from_char("s")) * rot_step
-        target[5] += axis(keyboard.KeyCode.from_char("e"), keyboard.KeyCode.from_char("d")) * rot_step
-        gripper_cmd = axis(keyboard.KeyCode.from_char("r"), keyboard.KeyCode.from_char("f"))
+        gripper_pos = 0.0
+        gripper_status = gripper.get_gripper_status()
+        if gripper_status is not None:
+            gripper_pos = max(0.0, min(gripper_max, gripper_status.msg.value))
 
-        clamp_pose(target)
-        robot.move_p(robot.get_tcp2flange_pose(target))
-        if gripper_cmd:
-            gripper_pos += gripper_cmd * gripper_step
-            gripper_pos = max(0.0, min(gripper_max, gripper_pos))
-            gripper.move_gripper_m(value=gripper_pos, force=gripper_force)
-        print(
-            f"tcp target: {[round(x, 3) for x in target]}, gripper: {gripper_pos:.3f}m",
-            end="\r",
-        )
-        time.sleep(dt)
-except KeyboardInterrupt:
-    print("")
-finally:
-    running = False
-    robot.disconnect()
+        listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+        listener.start()
+
+        print("Piper-L keyboard teleop")
+        print("arrows: x/y, page up/down: z, q/a: roll, w/s: pitch, e/d: yaw")
+        print("r/f: open/close gripper, space: home, esc or ctrl-c: quit")
+
+        while running:
+            if keys[keyboard.Key.space]:
+                robot.move_j(home)
+                time.sleep(1.0)
+                pose_msg = robot.get_tcp_pose()
+                if pose_msg is not None:
+                    target = list(pose_msg.msg)
+                keys[keyboard.Key.space] = False
+
+            target[0] += axis(keyboard.Key.up, keyboard.Key.down) * pos_step
+            target[1] += axis(keyboard.Key.left, keyboard.Key.right) * pos_step
+            target[2] += axis(keyboard.Key.page_up, keyboard.Key.page_down) * pos_step
+            target[3] += (
+                axis(keyboard.KeyCode.from_char("q"), keyboard.KeyCode.from_char("a"))
+                * rot_step
+            )
+            target[4] += (
+                axis(keyboard.KeyCode.from_char("w"), keyboard.KeyCode.from_char("s"))
+                * rot_step
+            )
+            target[5] += (
+                axis(keyboard.KeyCode.from_char("e"), keyboard.KeyCode.from_char("d"))
+                * rot_step
+            )
+            gripper_cmd = axis(
+                keyboard.KeyCode.from_char("r"), keyboard.KeyCode.from_char("f")
+            )
+
+            clamp_pose(target)
+            robot.move_p(robot.get_tcp2flange_pose(target))
+            if gripper_cmd:
+                gripper_pos += gripper_cmd * gripper_step
+                gripper_pos = max(0.0, min(gripper_max, gripper_pos))
+                gripper.move_gripper_m(value=gripper_pos, force=gripper_force)
+            print(
+                (
+                    f"tcp target: {[round(x, 3) for x in target]}, "
+                    f"gripper: {gripper_pos:.3f}m"
+                ),
+                end="\r",
+            )
+            time.sleep(dt)
+    except KeyboardInterrupt:
+        print("")
+    finally:
+        running = False
+        robot.disconnect()
+
+
+if __name__ == "__main__":
+    main()

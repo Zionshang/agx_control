@@ -15,6 +15,65 @@ Run server on the robot:
 arm_lcm_server
 ```
 
+Build Docker image:
+
+```bash
+docker build -f docker/Dockerfile -t agx-control-arm-lcm .
+```
+
+The build needs network access because `pyAgxArm` is installed from GitHub.
+
+Enter the Docker shell:
+
+```bash
+docker run --rm -it \
+  --network host \
+  --cap-add NET_ADMIN \
+  --cap-add NET_RAW \
+  agx-control-arm-lcm
+```
+
+Run this on the Linux robot host so `--network host` can expose the host
+`can0` SocketCAN interface and LCM multicast traffic to the container.
+
+Run commands inside the container:
+
+```bash
+arm_lcm_server
+arm_lcm_server --url "udpm://239.255.76.67:7667?ttl=1"
+keyboard_control
+joystick_control
+```
+
+The robot host should expose and configure `can0` before starting the
+container. For example, use the scripts in `can/` or check it with:
+
+```bash
+ip link show can0
+```
+
+Run examples directly after installing this package outside Docker:
+
+```bash
+keyboard_control
+joystick_control
+```
+
+For joystick control in Docker, pass the host input device when entering the
+container:
+
+```bash
+docker run --rm -it \
+  --network host \
+  --cap-add NET_ADMIN \
+  --cap-add NET_RAW \
+  --device /dev/input \
+  agx-control-arm-lcm
+```
+
+`keyboard_control` depends on Linux desktop keyboard input support, and
+`joystick_control` needs access to the host joystick input device.
+
 Send with the helper client:
 
 ```bash

@@ -15,6 +15,9 @@ dependencies = [
     "pyAgxArm @ git+https://github.com/agilexrobotics/pyAgxArm.git",
 ]
 
+[project.scripts]
+arm_lcm_server = "communication.lcm.arm_lcm_server:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["communication*"]

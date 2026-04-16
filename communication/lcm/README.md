@@ -12,8 +12,7 @@ lcm-gen -p defs/*.lcm
 Run server on the robot:
 
 ```bash
-cd communication/lcm
-python arm_lcm_server.py
+arm_lcm_server
 ```
 
 Send with the helper client:

@@ -5,7 +5,7 @@ import time
 import lcm
 from pyAgxArm import AgxArmFactory, ArmModel, PiperFW, create_agx_arm_config
 
-from msg import ArmCartesianCmd, ArmJointCmd, ArmServiceCmd, ArmState
+from .msg import ArmCartesianCmd, ArmJointCmd, ArmServiceCmd, ArmState
 
 
 ARM_CARTESIAN_CMD_CHANNEL = "ARM_CARTESIAN_CMD"
@@ -50,6 +50,7 @@ class ArmLcmServer:
             self.ensure_enabled()
             self.robot.set_speed_percent(100)
             self.robot.set_tcp_offset(TCP_OFFSET)
+            self.robot.move_j(HOME)
 
             self.lc = lcm.LCM(self.url)
             self.lc.subscribe(ARM_CARTESIAN_CMD_CHANNEL, self.on_cartesian_cmd)

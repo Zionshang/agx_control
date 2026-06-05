@@ -5,7 +5,8 @@ import time
 from typing import List, Optional, Sequence, TypedDict
 
 import lcm
-from msg import ArmCartesianCmd, ArmJointCmd, ArmServiceCmd, ArmState
+
+from .msg import ArmCartesianCmd, ArmJointCmd, ArmServiceCmd, ArmState
 
 
 ARM_CARTESIAN_CMD_CHANNEL = "ARM_CARTESIAN_CMD"

@@ -1,3 +1,5 @@
 [submodule "third_party/pyAgxArm"]
 	path = third_party/pyAgxArm
 	url = https://github.com/agilexrobotics/pyAgxArm.git
+[submodule "third_party/pyAgxArm/"]
+	branch = master

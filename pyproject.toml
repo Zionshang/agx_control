@@ -9,7 +9,6 @@ description = "AGX control examples and communication scripts"
 requires-python = ">=3.8,<=3.11"
 dependencies = [
     "numpy",
-    "pynput",
     "lcm",
     "pygame",
     "pyAgxArm @ file:third_party/pyAgxArm",

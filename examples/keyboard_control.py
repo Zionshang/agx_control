@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
+import curses
+import sys
 import time
 from math import pi
 
-from pynput import keyboard
 from pyAgxArm import AgxArmFactory, ArmModel, PiperFW, create_agx_arm_config
 
 
-dt = 0.02
+dt = 0.01
 pos_step = 0.001
 rot_step = 0.005
 gripper_step = 0.001
@@ -15,53 +15,6 @@ gripper_max = 0.1
 home = [0., 0., 0., 0., 0., 0.]
 tcp_offset = [0.0, 0.0, 0.13, 0.0, -1.57079632679, 0.0]
 
-keys = {
-    keyboard.Key.up: False,
-    keyboard.Key.down: False,
-    keyboard.Key.left: False,
-    keyboard.Key.right: False,
-    keyboard.Key.page_up: False,
-    keyboard.Key.page_down: False,
-    keyboard.Key.space: False,
-    keyboard.KeyCode.from_char("q"): False,
-    keyboard.KeyCode.from_char("a"): False,
-    keyboard.KeyCode.from_char("w"): False,
-    keyboard.KeyCode.from_char("s"): False,
-    keyboard.KeyCode.from_char("e"): False,
-    keyboard.KeyCode.from_char("d"): False,
-    keyboard.KeyCode.from_char("r"): False,
-    keyboard.KeyCode.from_char("f"): False,
-}
-running = True
-
-
-def norm_key(key):
-    if isinstance(key, keyboard.KeyCode) and key.char:
-        return keyboard.KeyCode.from_char(key.char.lower())
-    return key
-
-
-def on_press(key):
-    global running
-    key = norm_key(key)
-    if key == keyboard.Key.esc:
-        running = False
-        return False
-    if key in keys:
-        keys[key] = True
-    return None
-
-
-def on_release(key):
-    key = norm_key(key)
-    if key in keys:
-        keys[key] = False
-    return None
-
-
-def axis(pos_key, neg_key):
-    return int(keys[pos_key]) - int(keys[neg_key])
-
 
 def clamp_pose(pose):
     pose[3] = max(-pi, min(pi, pose[3]))
@@ -69,8 +22,120 @@ def clamp_pose(pose):
     pose[5] = max(-pi, min(pi, pose[5]))
 
 
+def add_status_line(screen, row, text):
+    height, width = screen.getmaxyx()
+    if row >= height:
+        return
+    screen.move(row, 0)
+    screen.clrtoeol()
+    screen.addnstr(row, 0, text, max(0, width - 1))
+
+
+def draw_status(screen, target, gripper_pos):
+    add_status_line(screen, 0, "Piper-L keyboard teleop")
+    add_status_line(
+        screen,
+        1,
+        "arrows: x/y, page up/down: z, q/a: roll, w/s: pitch, e/d: yaw",
+    )
+    add_status_line(screen, 2, "r/f: open/close gripper, space: home, esc or ctrl-c: quit")
+    add_status_line(
+        screen,
+        4,
+        f"tcp target: {[round(x, 3) for x in target]}, gripper: {gripper_pos:.3f}m",
+    )
+    screen.refresh()
+
+
+def apply_key(key, target):
+    if key == curses.KEY_UP:
+        target[0] += pos_step
+    elif key == curses.KEY_DOWN:
+        target[0] -= pos_step
+    elif key == curses.KEY_LEFT:
+        target[1] += pos_step
+    elif key == curses.KEY_RIGHT:
+        target[1] -= pos_step
+    elif key == curses.KEY_PPAGE:
+        target[2] += pos_step
+    elif key == curses.KEY_NPAGE:
+        target[2] -= pos_step
+    elif key == ord("q"):
+        target[3] += rot_step
+    elif key == ord("a"):
+        target[3] -= rot_step
+    elif key == ord("w"):
+        target[4] += rot_step
+    elif key == ord("s"):
+        target[4] -= rot_step
+    elif key == ord("e"):
+        target[5] += rot_step
+    elif key == ord("d"):
+        target[5] -= rot_step
+
+
+def run_teleop(screen, robot, gripper, target, gripper_pos):
+    try:
+        curses.curs_set(0)
+    except curses.error:
+        pass
+    try:
+        curses.set_escdelay(25)
+    except AttributeError:
+        pass
+    screen.keypad(True)
+    screen.nodelay(True)
+    screen.clear()
+    draw_status(screen, target, gripper_pos)
+
+    running = True
+    while running:
+        home_requested = False
+        gripper_cmd = 0
+
+        while True:
+            key = screen.getch()
+            if key == -1:
+                break
+            if key in (27, 3):
+                running = False
+                break
+            if 0 <= key < 256:
+                key = ord(chr(key).lower())
+            if key == ord(" "):
+                home_requested = True
+            elif key == ord("r"):
+                gripper_cmd += 1
+            elif key == ord("f"):
+                gripper_cmd -= 1
+            else:
+                apply_key(key, target)
+
+        if not running:
+            break
+
+        if home_requested:
+            robot.move_j(home)
+            time.sleep(1.0)
+            pose_msg = robot.get_tcp_pose()
+            if pose_msg is not None:
+                target[:] = list(pose_msg.msg)
+
+        clamp_pose(target)
+        robot.move_p(robot.get_tcp2flange_pose(target))
+        if gripper_cmd:
+            gripper_pos += gripper_cmd * gripper_step
+            gripper_pos = max(0.0, min(gripper_max, gripper_pos))
+            gripper.move_gripper_m(value=gripper_pos, force=gripper_force)
+        draw_status(screen, target, gripper_pos)
+        time.sleep(dt)
+
+    return gripper_pos
+
+
 def main():
-    global running
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        raise SystemExit("keyboard_control requires an interactive terminal.")
 
     cfg = create_agx_arm_config(
         robot=ArmModel.PIPER_L,
@@ -100,59 +165,10 @@ def main():
         if gripper_status is not None:
             gripper_pos = max(0.0, min(gripper_max, gripper_status.msg.value))
 
-        listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-        listener.start()
-
-        print("Piper-L keyboard teleop")
-        print("arrows: x/y, page up/down: z, q/a: roll, w/s: pitch, e/d: yaw")
-        print("r/f: open/close gripper, space: home, esc or ctrl-c: quit")
-
-        while running:
-            if keys[keyboard.Key.space]:
-                robot.move_j(home)
-                time.sleep(1.0)
-                pose_msg = robot.get_tcp_pose()
-                if pose_msg is not None:
-                    target = list(pose_msg.msg)
-                keys[keyboard.Key.space] = False
-
-            target[0] += axis(keyboard.Key.up, keyboard.Key.down) * pos_step
-            target[1] += axis(keyboard.Key.left, keyboard.Key.right) * pos_step
-            target[2] += axis(keyboard.Key.page_up, keyboard.Key.page_down) * pos_step
-            target[3] += (
-                axis(keyboard.KeyCode.from_char("q"), keyboard.KeyCode.from_char("a"))
-                * rot_step
-            )
-            target[4] += (
-                axis(keyboard.KeyCode.from_char("w"), keyboard.KeyCode.from_char("s"))
-                * rot_step
-            )
-            target[5] += (
-                axis(keyboard.KeyCode.from_char("e"), keyboard.KeyCode.from_char("d"))
-                * rot_step
-            )
-            gripper_cmd = axis(
-                keyboard.KeyCode.from_char("r"), keyboard.KeyCode.from_char("f")
-            )
-
-            clamp_pose(target)
-            robot.move_p(robot.get_tcp2flange_pose(target))
-            if gripper_cmd:
-                gripper_pos += gripper_cmd * gripper_step
-                gripper_pos = max(0.0, min(gripper_max, gripper_pos))
-                gripper.move_gripper_m(value=gripper_pos, force=gripper_force)
-            print(
-                (
-                    f"tcp target: {[round(x, 3) for x in target]}, "
-                    f"gripper: {gripper_pos:.3f}m"
-                ),
-                end="\r",
-            )
-            time.sleep(dt)
+        curses.wrapper(run_teleop, robot, gripper, target, gripper_pos)
     except KeyboardInterrupt:
         print("")
     finally:
-        running = False
         robot.disconnect()
 
 

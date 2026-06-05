@@ -74,8 +74,9 @@ docker run --rm -it \
   agx-control:latest
 ```
 
-`keyboard_control` depends on Linux desktop keyboard input support, and
-`joystick_control` needs access to the host joystick input device.
+`keyboard_control` uses standard terminal keyboard input and must run in an
+interactive TTY. `joystick_control` needs access to the host joystick input
+device.
 
 Send with the helper client:
 

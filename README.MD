@@ -14,5 +14,10 @@ pip install -e .
 ```
 ### Keyboard Control
 ```bash
+keyboard_control
+```
 
+### Lcm Server
+```bash
+arm_lcm_server
 ```

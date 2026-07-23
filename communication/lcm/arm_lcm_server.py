@@ -39,7 +39,7 @@ class ArmLcmServer:
         cfg = create_agx_arm_config(
             robot=ArmModel.PIPER_L,
             firmeware_version=PiperFW.V183,
-            channel="can0",
+            channel="can_agx",
         )
         self.robot = AgxArmFactory.create_arm(cfg)
         self.gripper = self.robot.init_effector(self.robot.OPTIONS.EFFECTOR.AGX_GRIPPER)

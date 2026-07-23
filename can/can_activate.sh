@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Usage:
-#   bash can_activate.sh             # can0 1000000
-#   bash can_activate.sh can1        # can1 1000000
-#   bash can_activate.sh can1 500000 # can1 500000
-DEFAULT_CAN_NAME="${1:-can0}"
+#   bash can_activate.sh                       # can_agx 1000000
+#   bash can_activate.sh can_agx               # can_agx 1000000
+#   bash can_activate.sh can_agx 500000        # can_agx 500000
+DEFAULT_CAN_NAME="${1:-can_agx}"
 
 # Check CAN interface name length (maximum 15 bytes in Linux)
 if [ ${#DEFAULT_CAN_NAME} -gt 15 ]; then
@@ -57,7 +57,7 @@ if [ "$CURRENT_CAN_COUNT" -ne "1" ]; then
         done
         echo -e " Error: The number of CAN modules detected by the system ($CURRENT_CAN_COUNT) does not match the expected number (1). "
         echo -e " Please add the USB hardware address parameter, such as: "
-        echo -e " bash can_activate.sh can0 1000000 1-2:1.0"
+        echo -e " bash can_activate.sh can_agx 1000000 1-2:1.0"
         echo "-------------------ERROR-----------------------"
         exit 1
     fi

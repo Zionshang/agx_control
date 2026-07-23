@@ -54,7 +54,7 @@ def main():
     cfg = create_agx_arm_config(
         robot=ArmModel.PIPER_L,
         firmeware_version=PiperFW.V183,
-        channel="can0",
+        channel="can_agx",
     )
     robot = AgxArmFactory.create_arm(cfg)
     gripper = robot.init_effector(robot.OPTIONS.EFFECTOR.AGX_GRIPPER)

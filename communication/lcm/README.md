@@ -35,7 +35,7 @@ docker run --rm -it \
 ```
 
 Run this on the Linux robot host so `--network host` can expose the host
-`can0` SocketCAN interface and LCM multicast traffic to the container.
+`can_agx` SocketCAN interface and LCM multicast traffic to the container.
 
 Run commands inside the container:
 
@@ -46,11 +46,11 @@ keyboard_control
 joystick_control
 ```
 
-The robot host should expose and configure `can0` before starting the
+The robot host should expose and configure `can_agx` before starting the
 container. For example, use the scripts in `can/` or check it with:
 
 ```bash
-ip link show can0
+ip link show can_agx
 ```
 
 Run examples directly after installing this package outside Docker:

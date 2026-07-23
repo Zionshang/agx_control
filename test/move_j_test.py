@@ -1,7 +1,7 @@
 import time
 from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, PiperFW
 
-cfg = create_agx_arm_config(robot=ArmModel.PIPER_L, firmeware_version=PiperFW.V183, channel="can0")
+cfg = create_agx_arm_config(robot=ArmModel.PIPER_L, firmeware_version=PiperFW.V183, channel="can_agx")
 robot = AgxArmFactory.create_arm(cfg)
 robot.connect()
 

@@ -24,8 +24,8 @@
 #     EXPECTED_CAN_COUNT=1
 #     这个值决定了系统中应该检测到的 CAN 模块数量。
 #   2.单个can模块的时候默认的 CAN 接口名称：
-#     DEFAULT_CAN_NAME="${1:-can0}"
-#     可以通过命令行参数指定默认的 CAN 接口名称，如果不提供参数，默认为 can0。
+#     DEFAULT_CAN_NAME="${1:-can_agx}"
+#     可以通过命令行参数指定默认的 CAN 接口名称，如果不提供参数，默认为 can_agx。
 #   3.单个 CAN 模块时的默认比特率：
 #     DEFAULT_BITRATE="${2:-500000}"
 #     可以通过命令行参数指定单个 CAN 模块时的比特率，如果不提供参数，默认为 500000。
@@ -42,7 +42,7 @@
 #      - 如果只有一个can模块，设定完上面的参数可以直接跳过此处往后看
 #      - (多个can模块)预定义的 USB 端口和目标接口名称：
 #          先将某个can模块插入到预期的usb口，注意在初次配置时，每次在工控机上插入一个can模块
-#          然后执行 sudo ethtool -i can0 | grep bus,并记录下 bus-info: 后面的参数
+#          然后执行 find_all_can_port.sh，并记录目标 USB-CAN 的 bus-info 参数
 #          接着插入下一个can模块，注意不可以与上次can模块插入的usb口相同，然后重复执行上一步
 #          (其实可以用一个can模块去插不同的usb，因为区分模块是根据usb地址来区分的)
 #          所有模块都设计好所应该在的usb口并记录完成后，
@@ -58,7 +58,7 @@
 #   3.运行脚本：
 #     使用 sudo 执行脚本，因为脚本需要管理员权限来修改网络接口：
 #       1.单个 CAN 模块
-#         1.可以通过命令行参数指定默认的 CAN 接口名称和比特率（默认为 can0 和 500000）：
+#         1.可以通过命令行参数指定默认的 CAN 接口名称和比特率（默认为 can_agx 和 1000000）：
 #           sudo bash ./can_config.sh [CAN接口名称] [比特率]
 #           例如，指定接口名称为 my_can_interface，比特率为 1000000：
 #           sudo bash ./can_config.sh my_can_interface 1000000
@@ -84,7 +84,7 @@
 
 #     USB 端口信息：
 #         确保你预定义的 USB 端口信息（bus-info）与实际系统中 ethtool 输出的信息一致。
-#         使用命令 sudo ethtool -i can0、sudo ethtool -i can1 等检查每个 CAN 接口的 bus-info。
+#         使用命令 sudo ethtool -i <CAN接口名称> 检查每个 CAN 接口的 bus-info。
 
 #     接口冲突：
 #         确保目标接口名称（如 can_device_1、can_device_2）是唯一的，不与系统中其他现有接口名称冲突。
@@ -96,7 +96,7 @@ EXPECTED_CAN_COUNT=1
 
 if [ "$EXPECTED_CAN_COUNT" -eq 1 ]; then
     # 默认的 CAN 名称，用户可以通过命令行参数设定
-    DEFAULT_CAN_NAME="${1:-can0}"
+    DEFAULT_CAN_NAME="${1:-can_agx}"
 
     # 单个 CAN 模块时的默认比特率，用户可以通过命令行参数设定
     DEFAULT_BITRATE="${2:-1000000}"

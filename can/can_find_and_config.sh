@@ -3,7 +3,7 @@
 # Usage: ./check_and_setup_can.sh <CAN_NAME> <BITRATE> <USB_ADDRESS> <TIMEOUT>
 
 # 默认参数
-CAN_NAME="${1:-can0}"
+CAN_NAME="${1:-can_agx}"
 BITRATE="${2:-1000000}"
 USB_ADDRESS="${3}"
 TIMEOUT="${4:-120}"  # 超时时间，默认 120 秒

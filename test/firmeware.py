@@ -1,6 +1,6 @@
 from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, PiperFW
 
-cfg = create_agx_arm_config(robot=ArmModel.PIPER, firmeware_version=PiperFW.DEFAULT, channel="can0")
+cfg = create_agx_arm_config(robot=ArmModel.PIPER, firmeware_version=PiperFW.DEFAULT, channel="can_agx")
 robot = AgxArmFactory.create_arm(cfg)
 robot.connect()
 

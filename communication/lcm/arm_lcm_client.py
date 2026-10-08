@@ -14,6 +14,7 @@ ARM_JOINT_CMD_CHANNEL = "ARM_JOINT_CMD"
 ARM_SERVICE_CMD_CHANNEL = "ARM_SERVICE_CMD"
 ARM_STATE_CHANNEL = "ARM_STATE"
 DEFAULT_LCM_URL = "udpm://239.255.76.67:7667?ttl=1"
+SET_SPEED_BASE = 1000
 
 __all__ = ["ArmLcmClient", "ArmStateDict"]
 
@@ -24,6 +25,8 @@ class ArmStateDict(TypedDict):
     joint_pos: List[float]
     tcp_pose: List[float]
     gripper_pos: float
+    arm_status: int
+    target_utime: int
 
 
 def utime() -> int:
@@ -39,11 +42,14 @@ class ArmLcmClient:
         tcp_pose: Sequence[float],
         gripper: float = 0.0,
         preview_time: float = 0.0,
+        gripper_duration: float = 0.0,
     ) -> None:
         msg = ArmCartesianCmd()
+        msg.utime = utime()
         msg.tcp_pose = list(tcp_pose)
         msg.gripper_pos = gripper
         msg.preview_time = preview_time
+        msg.gripper_duration = gripper_duration
         self.lc.publish(ARM_CARTESIAN_CMD_CHANNEL, msg.encode())
 
     def set_joint_cmd(
@@ -53,6 +59,7 @@ class ArmLcmClient:
         preview_time: float = 0.0,
     ) -> None:
         msg = ArmJointCmd()
+        msg.utime = utime()
         msg.joint_pos = list(joint_pos)
         msg.num_joints = len(msg.joint_pos)
         msg.gripper_pos = gripper
@@ -71,6 +78,14 @@ class ArmLcmClient:
         msg.command = ArmServiceCmd.PASSIVE
         self.lc.publish(ARM_SERVICE_CMD_CHANNEL, msg.encode())
 
+    def set_speed_percent(self, percent: int) -> None:
+        if not isinstance(percent, int) or not 1 <= percent <= 100:
+            raise ValueError("Speed percent must be an integer in [1, 100]")
+        msg = ArmServiceCmd()
+        msg.utime = utime()
+        msg.command = SET_SPEED_BASE + percent
+        self.lc.publish(ARM_SERVICE_CMD_CHANNEL, msg.encode())
+
     @staticmethod
     def decode_state(data: bytes) -> ArmStateDict:
         state = ArmState.decode(data)
@@ -80,6 +95,8 @@ class ArmLcmClient:
             "joint_pos": list(state.joint_pos),
             "tcp_pose": list(state.tcp_pose),
             "gripper_pos": state.gripper_pos,
+            "arm_status": state.arm_status,
+            "target_utime": state.target_utime,
         }
 
     def get_state(self, timeout: float = 1.0) -> Optional[ArmStateDict]:
@@ -131,6 +148,8 @@ if __name__ == "__main__":
             f"joints={[round(x, 3) for x in state['joint_pos']]}, "
             f"tcp={[round(x, 3) for x in state['tcp_pose']]}, "
             f"gripper={state['gripper_pos']:.3f}"
+            f", arm_status={state['arm_status']}"
+            f", target_utime={state['target_utime']}"
         )
 
     args = build_parser().parse_args()

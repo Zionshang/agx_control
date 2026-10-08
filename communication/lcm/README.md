@@ -105,4 +105,10 @@ Receive state:
 ```python
 state = client.get_state()
 print(state["joint_pos"], state["tcp_pose"], state["gripper_pos"])
+print(state["arm_status"], state["target_utime"])
 ```
+
+`arm_status` reports the Piper controller error code (`-1` means no status
+feedback is available). `target_utime` identifies the most recently accepted
+motion command (`0` means no target). Match it with the command timestamp when
+multiple commands may overlap.

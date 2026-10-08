@@ -8,4 +8,9 @@ struct ArmState
     double joint_pos[num_joints];
     double tcp_pose[6];
     double gripper_pos;
+
+    // Piper controller error code; -1 means status feedback is unavailable.
+    int8_t arm_status;
+    // Timestamp of the most recently accepted motion command; 0 means none.
+    int64_t target_utime;
 }

@@ -1,4 +1,4 @@
-package msg;
+package lcm_types;
 
 struct ArmState
 {

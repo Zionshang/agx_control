@@ -27,3 +27,5 @@ keyboard_control
 ```bash
 arm_lcm_server
 ```
+
+`keyboard_control` 和 `arm_lcm_server` 启动时自动使能并回到 home（六个关节角均为 0）；退出时先切换到 passive（失能），再断开连接。支持正常退出、Ctrl-C 和 SIGTERM。

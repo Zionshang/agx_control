@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import signal
 import time
 
 import lcm
@@ -21,6 +22,10 @@ GRIPPER_FORCE = 2.5
 GRIPPER_MAX = 0.1
 STATE_DT = 0.02
 GRIPPER_DT = 0.05
+
+
+def handle_sigterm(signum, frame):
+    raise SystemExit(0)
 
 
 def build_parser():
@@ -55,8 +60,12 @@ class ArmLcmServer:
         self.gripper = self.robot.init_effector(self.robot.OPTIONS.EFFECTOR.AGX_GRIPPER)
 
     def run(self):
+        connected = False
+        previous_sigterm_handler = signal.getsignal(signal.SIGTERM)
         try:
+            signal.signal(signal.SIGTERM, handle_sigterm)
             self.robot.connect()
+            connected = True
             self.ensure_enabled()
             self.robot.set_speed_percent(100)
             self.robot.set_tcp_offset(TCP_OFFSET)
@@ -72,7 +81,14 @@ class ArmLcmServer:
         except KeyboardInterrupt:
             print("")
         finally:
-            self.robot.disconnect()
+            try:
+                if connected:
+                    self.robot.disable()
+            finally:
+                try:
+                    self.robot.disconnect()
+                finally:
+                    signal.signal(signal.SIGTERM, previous_sigterm_handler)
 
     def spin(self):
         next_state_t = time.monotonic()

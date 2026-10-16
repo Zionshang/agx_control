@@ -1,4 +1,5 @@
 import curses
+import signal
 import sys
 import time
 from math import pi
@@ -14,6 +15,10 @@ gripper_force = 1.0
 gripper_max = 0.1
 home = [0., 0., 0., 0., 0., 0.]
 tcp_offset = [0.0, 0.0, 0.13, 0.0, -1.57079632679, 0.0]
+
+
+def handle_sigterm(signum, frame):
+    raise SystemExit(0)
 
 
 def clamp_pose(pose):
@@ -145,8 +150,12 @@ def main():
     robot = AgxArmFactory.create_arm(cfg)
     gripper = robot.init_effector(robot.OPTIONS.EFFECTOR.AGX_GRIPPER)
 
+    connected = False
+    previous_sigterm_handler = signal.getsignal(signal.SIGTERM)
     try:
+        signal.signal(signal.SIGTERM, handle_sigterm)
         robot.connect()
+        connected = True
         while not robot.enable():
             time.sleep(0.01)
         robot.set_speed_percent(100)
@@ -169,7 +178,14 @@ def main():
     except KeyboardInterrupt:
         print("")
     finally:
-        robot.disconnect()
+        try:
+            if connected:
+                robot.disable()
+        finally:
+            try:
+                robot.disconnect()
+            finally:
+                signal.signal(signal.SIGTERM, previous_sigterm_handler)
 
 
 if __name__ == "__main__":

@@ -83,6 +83,8 @@ class ArmLcmServer:
         finally:
             try:
                 if connected:
+                    self.robot.move_j(HOME)
+                    time.sleep(2.0)
                     self.robot.disable()
             finally:
                 try:
@@ -109,10 +111,10 @@ class ArmLcmServer:
 
     def ensure_enabled(self):
         start_t = time.monotonic()
-        while not self.robot.enable() and time.monotonic() - start_t < 3.0:
+        while not self.robot.enable():
+            if time.monotonic() - start_t >= 3.0:
+                raise RuntimeError("Failed to enable robot within 3 seconds.")
             time.sleep(0.01)
-        if time.monotonic() - start_t >= 3.0:
-            raise RuntimeError("Failed to enable robot within 3 seconds.")
 
     def move_gripper(self, pos, duration=0.0):
         target = clamp(pos, 0.0, GRIPPER_MAX)
@@ -174,7 +176,6 @@ class ArmLcmServer:
 
     def on_cartesian_cmd(self, channel, data):
         cmd = ArmCartesianCmd.decode(data)
-        self.ensure_enabled()
         self.robot.move_p(self.robot.get_tcp2flange_pose(list(cmd.tcp_pose)))
         self.register_target(cmd.utime)
         self.move_gripper(cmd.gripper_pos, cmd.gripper_duration)
@@ -184,7 +185,6 @@ class ArmLcmServer:
         if cmd.num_joints != 6:
             print(f"Ignore joint cmd: expected 6 joints, got {cmd.num_joints}")
             return
-        self.ensure_enabled()
         self.robot.move_j(list(cmd.joint_pos))
         self.register_target(cmd.utime)
         self.move_gripper(cmd.gripper_pos)
@@ -196,7 +196,6 @@ class ArmLcmServer:
             self.robot.set_speed_percent(percent)
             print(f"Service: SPEED {percent}%")
         elif cmd.command == ArmServiceCmd.HOME:
-            self.ensure_enabled()
             self.robot.move_j(HOME)
             self.register_target(cmd.utime)
             print("Service: HOME")

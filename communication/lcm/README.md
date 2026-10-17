@@ -47,9 +47,11 @@ joystick_control
 ```
 
 The robot host should expose and configure `can_agx` before starting the
-container. For example, use the scripts in `can/` or check it with:
+container. From the project root, run `can_activate.sh` to select and configure
+the CAN device, then check the interface:
 
 ```bash
+./can/can_activate.sh
 ip link show can_agx
 ```
 

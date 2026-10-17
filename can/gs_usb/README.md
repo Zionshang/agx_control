@@ -107,12 +107,11 @@ sudo dmesg --color=always | tail -n 50
 
 ## 启用 CAN 接口
 
-这台 Jetson 上机械臂 USB-CAN 的硬件地址是 `1-4.1.2:1.0`。使用项目脚本将
-它重命名为 `can_agx`，设置为 1 Mbit/s 并启用：
+在项目根目录运行以下脚本，按编号选择机械臂的 USB-CAN；只有一个设备时
+自动选中。脚本将它重命名为 `can_agx`，设置为 1 Mbit/s 并启用：
 
 ```bash
-cd ~/python_ws/agx_control
-bash ./can/can_activate.sh can_agx 1000000 "1-4.1.2:1.0"
+./can/can_activate.sh
 ip -details link show can_agx
 candump can_agx
 ```

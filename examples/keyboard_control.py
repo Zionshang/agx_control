@@ -180,6 +180,8 @@ def main():
     finally:
         try:
             if connected:
+                robot.move_j(home)
+                time.sleep(2.0)
                 robot.disable()
         finally:
             try:

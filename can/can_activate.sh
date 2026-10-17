@@ -1,148 +1,95 @@
 #!/bin/bash
+set -euo pipefail
 
-# Usage:
-#   bash can_activate.sh                       # can_agx 1000000
-#   bash can_activate.sh can_agx               # can_agx 1000000
-#   bash can_activate.sh can_agx 500000        # can_agx 500000
+# Usage: ./can_activate.sh [CAN_NAME] [BITRATE] [USB_ADDRESS]
+# Without USB_ADDRESS, select a detected CAN device interactively.
 DEFAULT_CAN_NAME="${1:-can_agx}"
-
-# Check CAN interface name length (maximum 15 bytes in Linux)
-if [ ${#DEFAULT_CAN_NAME} -gt 15 ]; then
-    echo "Error: CAN interface name '$DEFAULT_CAN_NAME' exceeds maximum length of 15 bytes."
-    echo "Please use a shorter name for the CAN interface."
-    exit 1
-fi
-
 DEFAULT_BITRATE="${2:-1000000}"
+USB_ADDRESS="${3:-}"
 
-# USB hardware address (optional parameter)
-USB_ADDRESS="${3}"
-echo "-------------------START-----------------------"
-echo "CAN name: $DEFAULT_CAN_NAME, bitrate: $DEFAULT_BITRATE"
-# Check if ethtool is installed.
-if ! dpkg -l | grep -q "ethtool"; then
-    echo "Error: ethtool not detected in the system."
-    echo "Please use the following command to install ethtool:"
-    echo "sudo apt update && sudo apt install ethtool"
+if [ ${#DEFAULT_CAN_NAME} -gt 15 ]; then
+    echo "错误: CAN 接口名称不能超过 15 字节。" >&2
+    exit 1
+fi
+if [[ ! "$DEFAULT_BITRATE" =~ ^[1-9][0-9]*$ ]]; then
+    echo "错误: 比特率必须为正整数。" >&2
     exit 1
 fi
 
-# Check if can-utils is installed.
-if ! dpkg -l | grep -q "can-utils"; then
-    echo "Error: can-utils not detected in the system."
-    echo "Please use the following command to install ethtool:"
-    echo "sudo apt update && sudo apt install can-utils"
-    exit 1
-fi
-
-echo "Both ethtool and can-utils are installed."
-
-# Retrieve the number of CAN modules in the current system.
-CURRENT_CAN_COUNT=$(ip link show type can | grep -c "link/can")
-
-# Verify if the number of CAN modules in the current system matches the expected value.
-if [ "$CURRENT_CAN_COUNT" -ne "1" ]; then
-    if [ -z "$USB_ADDRESS" ]; then
-        # Iterate through all CAN interfaces.
-        for iface in $(ip -br link show type can | awk '{print $1}'); do
-            # Use ethtool to retrieve bus-info.
-            BUS_INFO=$(sudo ethtool -i "$iface" | grep "bus-info" | awk '{print $2}')
-            
-            if [ -z "$BUS_INFO" ];then
-                echo "Error: Unable to retrieve bus-info for interface $iface."
-                continue
-            fi
-            
-            echo "Interface $iface is inserted into USB port $BUS_INFO"
-        done
-        echo -e " Error: The number of CAN modules detected by the system ($CURRENT_CAN_COUNT) does not match the expected number (1). "
-        echo -e " Please add the USB hardware address parameter, such as: "
-        echo -e " bash can_activate.sh can_agx 1000000 1-2:1.0"
-        echo "-------------------ERROR-----------------------"
+for tool in ip ethtool; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "错误: 缺少 $tool，请先安装: sudo apt install iproute2 ethtool" >&2
         exit 1
     fi
+done
+
+sudo_cmd=()
+if [ "$EUID" -ne 0 ]; then
+    sudo_cmd=(sudo)
 fi
 
-# Load the gs_usb module.
-# sudo modprobe gs_usb
-# if [ $? -ne 0 ]; then
-#     echo "Error: Unable to load the gs_usb module."
-#     exit 1
-# fi
+can_links=$(ip -br link show type can)
+mapfile -t interfaces < <(awk 'NF {print $1}' <<< "$can_links")
+if [ ${#interfaces[@]} -eq 0 ]; then
+    echo "错误: 未检测到 CAN 设备，请检查连接和驱动。" >&2
+    exit 1
+fi
+
+entries=()
+INTERFACE_NAME=""
+for iface in "${interfaces[@]}"; do
+    bus_info=$("${sudo_cmd[@]}" ethtool -i "$iface" 2>/dev/null |
+        awk '$1 == "bus-info:" {print $2}') || bus_info=""
+    entries+=("$iface (USB: ${bus_info:-未知})")
+    if [ -n "$USB_ADDRESS" ] && [ "$bus_info" = "$USB_ADDRESS" ]; then
+        INTERFACE_NAME="$iface"
+    fi
+done
 
 if [ -n "$USB_ADDRESS" ]; then
-    echo "Detected USB hardware address parameter: $USB_ADDRESS"
-    
-    # Use ethtool to find the CAN interface corresponding to the USB hardware address.
-    INTERFACE_NAME=""
-    for iface in $(ip -br link show type can | awk '{print $1}'); do
-        BUS_INFO=$(sudo ethtool -i "$iface" | grep "bus-info" | awk '{print $2}')
-        if [ "$BUS_INFO" = "$USB_ADDRESS" ]; then
-            INTERFACE_NAME="$iface"
+    if [ -z "$INTERFACE_NAME" ]; then
+        echo "错误: 未找到 USB 地址为 $USB_ADDRESS 的 CAN 设备。" >&2
+        exit 1
+    fi
+elif [ ${#interfaces[@]} -eq 1 ]; then
+    INTERFACE_NAME="${interfaces[0]}"
+    echo "检测到唯一 CAN 设备: ${entries[0]}"
+else
+    echo "检测到 ${#interfaces[@]} 个 CAN 设备:"
+    PS3="请选择 CAN 设备编号: "
+    select entry in "${entries[@]}"; do
+        if [ -n "$entry" ]; then
+            INTERFACE_NAME="${interfaces[10#$REPLY-1]}"
             break
         fi
+        echo "编号无效，请重新选择。" >&2
     done
-    
     if [ -z "$INTERFACE_NAME" ]; then
-        echo "Error: Unable to find CAN interface corresponding to USB hardware address $USB_ADDRESS."
+        echo "未选择设备，已取消配置。" >&2
         exit 1
-    else
-        echo "Found the interface corresponding to USB hardware address $USB_ADDRESS: $INTERFACE_NAME."
-    fi
-else
-    # Retrieve the unique CAN interface.
-    INTERFACE_NAME=$(ip -br link show type can | awk '{print $1}')
-    
-    # Check if the interface name has been retrieved.
-    if [ -z "$INTERFACE_NAME" ]; then
-        echo "Error: Unable to detect CAN interface."
-        exit 1
-    fi
-    BUS_INFO=$(sudo ethtool -i "$INTERFACE_NAME" | grep "bus-info" | awk '{print $2}')
-    echo "Expected to configure a single CAN module, detected interface $INTERFACE_NAME with corresponding USB address $BUS_INFO."
-fi
-
-# Check if the current interface is already activated.
-IS_LINK_UP=$(ip link show "$INTERFACE_NAME" | grep -q "UP" && echo "yes" || echo "no")
-
-# Retrieve the bitrate of the current interface.
-CURRENT_BITRATE=$(ip -details link show "$INTERFACE_NAME" | grep -oP 'bitrate \K\d+')
-
-if [ "$IS_LINK_UP" = "yes" ] && [ "$CURRENT_BITRATE" -eq "$DEFAULT_BITRATE" ]; then
-    echo "Interface $INTERFACE_NAME is already activated with a bitrate of $DEFAULT_BITRATE."
-    
-    # Check if the interface name matches the default name.
-    if [ "$INTERFACE_NAME" != "$DEFAULT_CAN_NAME" ]; then
-        echo "Rename interface $INTERFACE_NAME to $DEFAULT_CAN_NAME."
-        sudo ip link set "$INTERFACE_NAME" down
-        sudo ip link set "$INTERFACE_NAME" name "$DEFAULT_CAN_NAME"
-        sudo ip link set "$DEFAULT_CAN_NAME" up
-        echo "The interface has been renamed to $DEFAULT_CAN_NAME and reactivated."
-    else
-        echo "The interface name is already $DEFAULT_CAN_NAME."
-    fi
-else
-    # If the interface is not activated or the bitrate is different, configure it.
-    if [ "$IS_LINK_UP" = "yes" ]; then
-        echo "Interface $INTERFACE_NAME is already activated, but the bitrate is $CURRENT_BITRATE, which does not match the set value of $DEFAULT_BITRATE."
-    else
-        echo "Interface $INTERFACE_NAME is not activated or bitrate is not set."
-    fi
-    
-    # Set the interface bitrate and activate it.
-    sudo ip link set "$INTERFACE_NAME" down
-    sudo ip link set "$INTERFACE_NAME" type can bitrate $DEFAULT_BITRATE
-    sudo ip link set "$INTERFACE_NAME" up
-    echo "Interface $INTERFACE_NAME has been reset to bitrate $DEFAULT_BITRATE and activated."
-    
-    # Rename the interface to the default name.
-    if [ "$INTERFACE_NAME" != "$DEFAULT_CAN_NAME" ]; then
-        echo "Rename interface $INTERFACE_NAME to $DEFAULT_CAN_NAME."
-        sudo ip link set "$INTERFACE_NAME" down
-        sudo ip link set "$INTERFACE_NAME" name "$DEFAULT_CAN_NAME"
-        sudo ip link set "$DEFAULT_CAN_NAME" up
-        echo "The interface has been renamed to $DEFAULT_CAN_NAME and reactivated."
     fi
 fi
 
-echo "-------------------OVER------------------------"
+if [ "$INTERFACE_NAME" != "$DEFAULT_CAN_NAME" ] &&
+    ip link show "$DEFAULT_CAN_NAME" >/dev/null 2>&1; then
+    echo "错误: 接口 $DEFAULT_CAN_NAME 已存在，请选择该设备或指定其他接口名称。" >&2
+    exit 1
+fi
+
+echo "配置 $INTERFACE_NAME → $DEFAULT_CAN_NAME，比特率 $DEFAULT_BITRATE"
+link_details=$(ip -details link show "$INTERFACE_NAME")
+current_bitrate=$(awk '{for (i=1; i<NF; i++) if ($i == "bitrate") {print $(i+1); exit}}' <<< "$link_details")
+if [ "$INTERFACE_NAME" = "$DEFAULT_CAN_NAME" ] &&
+    [ "$current_bitrate" = "$DEFAULT_BITRATE" ] &&
+    grep -Eq '<([^>]*,)?UP(,|>)' <<< "$link_details"; then
+    echo "$DEFAULT_CAN_NAME 已启用，无需修改。"
+    exit 0
+fi
+
+"${sudo_cmd[@]}" ip link set "$INTERFACE_NAME" down
+"${sudo_cmd[@]}" ip link set "$INTERFACE_NAME" type can bitrate "$DEFAULT_BITRATE"
+if [ "$INTERFACE_NAME" != "$DEFAULT_CAN_NAME" ]; then
+    "${sudo_cmd[@]}" ip link set "$INTERFACE_NAME" name "$DEFAULT_CAN_NAME"
+fi
+"${sudo_cmd[@]}" ip link set "$DEFAULT_CAN_NAME" up
+echo "配置完成: $DEFAULT_CAN_NAME，比特率 $DEFAULT_BITRATE，已启用。"

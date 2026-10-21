@@ -182,7 +182,9 @@ def main():
             if connected:
                 robot.move_j(home)
                 time.sleep(2.0)
+                gripper.disable_gripper()
                 robot.disable()
+                time.sleep(0.1)
         finally:
             try:
                 robot.disconnect()

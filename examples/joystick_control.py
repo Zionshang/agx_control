@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import time
+import signal
 from math import pi
 
 import pygame
@@ -50,6 +51,10 @@ def clamp_pose(pose):
     pose[5] = max(-pi, min(pi, pose[5]))
 
 
+def handle_sigterm(signum, frame):
+    raise SystemExit(0)
+
+
 def main():
     cfg = create_agx_arm_config(
         robot=ArmModel.PIPER_L,
@@ -68,8 +73,12 @@ def main():
     joy = pygame.joystick.Joystick(0)
     joy.init()
 
+    connected = False
+    previous_sigterm_handler = signal.getsignal(signal.SIGTERM)
     try:
+        signal.signal(signal.SIGTERM, handle_sigterm)
         robot.connect()
+        connected = True
         start_t = time.monotonic()
         while not robot.enable() and time.monotonic() - start_t < 3.0:
             time.sleep(0.01)
@@ -141,8 +150,19 @@ def main():
     except KeyboardInterrupt:
         print("")
     finally:
-        robot.disconnect()
-        pygame.quit()
+        try:
+            if connected:
+                robot.move_j(home)
+                time.sleep(2.0)
+                gripper.disable_gripper()
+                robot.disable()
+                time.sleep(0.1)
+        finally:
+            try:
+                robot.disconnect()
+            finally:
+                pygame.quit()
+                signal.signal(signal.SIGTERM, previous_sigterm_handler)
 
 
 if __name__ == "__main__":

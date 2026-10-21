@@ -18,6 +18,7 @@ dependencies = [
 arm_lcm_server = "communication.lcm.arm_lcm_server:main"
 keyboard_control = "examples.keyboard_control:main"
 joystick_control = "examples.joystick_control:main"
+gravity_compensation = "examples.gravity_compensation:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

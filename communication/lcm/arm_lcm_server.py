@@ -31,6 +31,7 @@ def handle_sigterm(signum, frame):
 def build_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", default=DEFAULT_LCM_URL)
+    parser.add_argument("--enable-timeout", type=float, default=15.0)
     return parser
 
 
@@ -45,11 +46,14 @@ def status_code(value):
 
 
 class ArmLcmServer:
-    def __init__(self, url=DEFAULT_LCM_URL):
+    def __init__(self, url=DEFAULT_LCM_URL, enable_timeout=15.0):
         self.url = url
         self.lc = None
         self.target_utime = 0
         self.gripper_ramp = None
+        if not 0 < enable_timeout < float('inf'):
+            raise ValueError('enable_timeout must be positive and finite')
+        self.enable_timeout = enable_timeout
 
         cfg = create_agx_arm_config(
             robot=ArmModel.PIPER_L,
@@ -70,6 +74,7 @@ class ArmLcmServer:
             self.robot.set_speed_percent(100)
             self.robot.set_tcp_offset(TCP_OFFSET)
             self.robot.move_j(HOME)
+            print('[ARM][INIT] 使能确认通过，启动 HOME 指令已发送', flush=True)
 
             self.lc = lcm.LCM(self.url)
             self.lc.subscribe(ARM_CARTESIAN_CMD_CHANNEL, self.on_cartesian_cmd)
@@ -83,9 +88,13 @@ class ArmLcmServer:
         finally:
             try:
                 if connected:
+                    print('[ARM][EXIT] 发送 HOME：六关节归零', flush=True)
                     self.robot.move_j(HOME)
+                    print('[ARM][EXIT] HOME 指令已发送，等待 2 秒后失能', flush=True)
                     time.sleep(2.0)
+                    self.gripper.disable_gripper()
                     self.robot.disable()
+                    time.sleep(0.1)
             finally:
                 try:
                     self.robot.disconnect()
@@ -109,12 +118,36 @@ class ArmLcmServer:
         print(f"  {ARM_SERVICE_CMD_CHANNEL}: ArmServiceCmd")
         print(f"  {ARM_STATE_CHANNEL}: ArmState")
 
+    def enable_feedback(self):
+        states = []
+        for joint in range(1, 7):
+            message = self.robot.get_driver_states(joint)
+            if message is None:
+                states.append(f'J{joint}=no_feedback')
+                continue
+            status = message.msg.foc_status
+            flags = [name for name in ('voltage_too_low', 'motor_overheating',
+                     'driver_overcurrent', 'driver_overheating', 'collision_status',
+                     'driver_error_status', 'stall_status') if getattr(status, name, False)]
+            value = 'enabled' if status.driver_enable_status else 'disabled'
+            states.append(f'J{joint}={value}' + (f"({','.join(flags)})" if flags else ''))
+        return ' '.join(states)
+
     def ensure_enabled(self):
-        start_t = time.monotonic()
-        while not self.robot.enable():
-            if time.monotonic() - start_t >= 3.0:
-                raise RuntimeError("Failed to enable robot within 3 seconds.")
-            time.sleep(0.01)
+        start_t = next_report = time.monotonic()
+        while True:
+            if self.robot.enable():
+                print(f'[ARM][ENABLE] 六关节使能已确认，耗时 {time.monotonic()-start_t:.1f}s', flush=True)
+                return
+            now = time.monotonic()
+            if now >= next_report:
+                print(f'[ARM][ENABLE] 等待使能反馈 {now-start_t:.1f}/{self.enable_timeout:g}s：'
+                      f'{self.enable_feedback()}', flush=True)
+                next_report = now + 1.0
+            if now-start_t >= self.enable_timeout:
+                raise RuntimeError(f'Failed to confirm all six joints enabled within '
+                                   f'{self.enable_timeout:g} seconds. {self.enable_feedback()}')
+            time.sleep(0.1)
 
     def move_gripper(self, pos, duration=0.0):
         target = clamp(pos, 0.0, GRIPPER_MAX)
@@ -200,6 +233,8 @@ class ArmLcmServer:
             self.register_target(cmd.utime)
             print("Service: HOME")
         elif cmd.command == ArmServiceCmd.PASSIVE:
+            self.gripper_ramp = None
+            self.gripper.disable_gripper()
             self.robot.disable()
             self.target_utime = 0
             print("Service: PASSIVE")
@@ -209,7 +244,7 @@ class ArmLcmServer:
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    ArmLcmServer(url=args.url).run()
+    ArmLcmServer(url=args.url, enable_timeout=args.enable_timeout).run()
 
 
 if __name__ == "__main__":
